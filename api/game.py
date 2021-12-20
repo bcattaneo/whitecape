@@ -1,32 +1,33 @@
 import subprocess
+import sys
+import time
+import chess
 
-STOCKFISH_PATH = "stockfish/stockfish.exe"
 MOVEMENT_PREFIX = "position startpos move"
 
 
 class Game:
-    def __init__(self, starting_position=[], stockfish_path=STOCKFISH_PATH):
-        # TODO: validate starting position
-        # starting_position = list of position strings
+    def __init__(self, stockfish_path, starting_position=[]):
+        self.board = chess.Board()
         self.position = starting_position
         self.stockfish_path = stockfish_path
+        self.__init_board()  # throws exception on first bad move in starting position
+
+    def sanToUciSteps(steps):
+        temp_board = chess.Board()
+        return list(map(lambda step: str(temp_board.push_san(step)), steps))
 
     def move(self, movement):
-        new_position = list(self.position)
-        new_position.append(movement)
-        # TODO: validate here new position is valid
-        # otherwise return false (or throw exception)
-        if True:
-            self.position = new_position
-            return True
-        else:
-            return False
+        self.board.push_uci(movement)  # throws exception if bad move
+        self.position.append(movement)
 
     def display(self):
         return "\n".join(self.__run_stockfish("d").split("\n")[2:20])
 
     def best_move(self):
-        return self.__run_stockfish("go depth 25").split("\n")[2].replace("bestmove ", "")
+        # TODO: include ponder in the API response?
+        output = self.__run_stockfish("go depth 20").split("\n")[-1]
+        return "" if "bestmove (none)" in output else output[9:13]
 
     def apply_best_move(self):
         new_best_move = self.best_move()
@@ -35,21 +36,23 @@ class Game:
 
     def __run_stockfish(self, command):
         commands = [self.__get_position(), command]
-        # program = subprocess.Popen([self.__get_stockfish_path(), "\n".join(commands)],
-        program = subprocess.Popen(self.__get_stockfish_path(),
+        process = subprocess.Popen([self.__get_stockfish_path()],
                                    stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+                                   universal_newlines=True)
+        for c in commands:
+            time.sleep(0.5)
+            print(c, file=process.stdin, flush=True)
 
-        [out, err] = program.communicate(
-            ("\n".join(commands)).encode(), timeout=50)
-        # program.wait(timeout=10)
+        time.sleep(5)
 
-        # TODO: throw exception when there are errors
-        # print(err.decode(), file=sys.stderr)
-        # print(program.stdout.readlines())
-        # return program.stdout
-        return out.decode().strip()
+        output = process.communicate()[0]
+        # print(output)
+        return output.strip()
+
+    def __init_board(self):
+        for move in self.position:
+            self.board.push_uci(move)
 
     def __get_stockfish_path(self):
         return self.stockfish_path

@@ -3,9 +3,14 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from game import Game
-app = Flask(__name__)
+from dotenv import load_dotenv
+from os import environ
+load_dotenv()
 
+STOCKFISH_PATH = environ.get("stockfish-path")
 VERSION = "1.0"
+
+app = Flask(__name__)
 app.config["DEBUG"] = True
 limiter = Limiter(app, key_func=get_remote_address)
 CORS(app)
@@ -22,8 +27,7 @@ def status():
 def best_move():
     try:
         steps = request.get_json(force=True)
-        print(steps)
-        game = Game(steps)
+        game = Game(STOCKFISH_PATH, Game.sanToUciSteps(steps))
         return ok_response(game.best_move())
     except Exception:
         return generic_error(3, "Invalid input steps")
@@ -60,17 +64,6 @@ def ok_response(data):
 
 
 def main():
-    game = Game()
-    # print(game.display())
-    # print()
-    print(f"Next best move: {game.best_move()}")
-    # game.move("a7a6")
-    # print(game.display())
-    print(game.display())
-    # for i in range(35):
-    #     print(f"Applying best move: {game.apply_best_move()}")
-    #     # print(game.display())
-    # print(game.display())
     app.run(threaded=True, use_reloader=True)
 
 
